@@ -137,6 +137,7 @@ When the user selects "Ad-Hoc":
 - Each row contains: Name, Membership Level, Notes (dropdown), Payment amount.
 - Notes dropdown options: No Show, Youth Under 18, Youth Robotics, Makerschool, Paid Using Donate Online, Do Not Sign Off.
 - Auto-populated from RSVP data when using portal mode.
+- Each attendee is sent to the server as a 4-element array: `[name, notesString, memberLevel, payment]`. The server splices elements 0 and 1 (`a.splice(0,2,a[0]+a[1])`) to produce a 3-element array: `[nameWithNotes, memberLevel, payment]`.
 
 ### 4.5 Cost Calculation
 
@@ -179,6 +180,7 @@ When the form is submitted:
    - An embedded event card (if event data is available) showing event details.
    - The attendee list rendered as a styled HTML table.
    - Material cost notation and sign-off type indicators.
+   - A red warning banner if class type is Safety Sign-Off (`sType==2`): "No NovaPass or tool sign off. Safety Sign-Off Only."
 3. The PDF is attached along with any receipt files.
 4. The email is sent to:
    - The accounting relay address(es) (`AccAddr`).
@@ -202,10 +204,11 @@ When the form is submitted:
 
 ### 5.2 Responsive Design
 
-Four breakpoints:
+Five breakpoints:
 - Default: Content box at 80% width.
 - `max-width: 900px`: Content box at 88% width.
 - `max-width: 570px`: Full width, smaller fonts and table text.
+- `max-width: 350px`: Narrows detail elements to 60% width.
 - `max-width: 300px`: 70% zoom fallback.
 
 ### 5.3 Status Overlay
@@ -220,7 +223,11 @@ An animated notification bar within the form area shows errors and success messa
 
 Input fields use a `charPattern` attribute with regex patterns to filter keystrokes in real time, preventing invalid characters from being typed.
 
-### 5.6 Built-in Test Mode
+### 5.6 URL Query Parameter Auto-Fill
+
+Loading the page with a `?id=<eventId>` query parameter automatically switches to portal mode and triggers an event lookup for that ID on first connect. This is used by external tools (e.g., `wautils.nova-labs.org`) to deep-link directly to a specific event.
+
+### 5.7 Built-in Test Mode
 
 Calling `test()` in the browser console populates the form with mock data (fake event, fake attendees, test email) for development and testing purposes.
 
@@ -297,7 +304,7 @@ An interactive stdin interface provides:
 | `IDTimeout` | 4 hours | Disconnected session retention |
 | `MaxUpload` | 1GB | Maximum receipt upload size |
 | `MailHost` | formbot@nova-labs.org | SMTP sender address |
-| `AccAddr` | formbot-events-relay@nova-labs.org | Accounting recipient(s) |
+| `AccAddr` | `['formbot-events-relay@nova-labs.org']` | Accounting recipient(s) (array) |
 | `MemAddr` | formbot-membership-relay@nova-labs.org | Membership recipient |
 
 ---
@@ -319,7 +326,7 @@ node server
 
 ### 8.3 Production
 
-- Systemd service file (`formbot.service`) for automatic startup and restart.
+- Systemd service file (`formbot.service`) for automatic startup and restart. Note: the `ExecStart` path is hardcoded to the developer's home directory and must be updated for other deployments.
 - Runs inside a GNU Screen session via `run.sh` for console access.
 - Service type is `forking` with `Restart=always`.
 
