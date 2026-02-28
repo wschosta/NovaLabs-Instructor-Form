@@ -124,6 +124,9 @@ These patterns are enforced both client-side (via `charPat` keystroke filtering)
 - **`EvLoad` flag**: Only one event can be loaded at a time. This is intentional to prevent concurrent Wild Apricot API calls.
 - **`rData` on socket**: Receipt upload data is stored directly on the socket object (`sck.rData`). It is consumed and deleted on form submission.
 - **Test email detection**: If the instructor email is `test@example.com`, the email subject is prefixed with `<<FORMBOT_TEST>>`. Do not remove this.
+- **Session timeout duplication**: The 4-hour session lifetime is hardcoded in both `server.js` (`IDTimeout=4*3600000`) and `form.js` (cookie `maxAge=4*3600`). These must stay in sync.
+- **`sType` integer values**: Class type is sent as an integer — `0` = Project (no sign-off), `1` = Tool Sign-Off, `2` = Safety Sign-Off. When `sType > 0`, the membership relay address is included in the email recipients.
+- **`AccAddr` is an array**: The accounting address constant is an array (`AccAddr.slice()` is called before appending), allowing multiple accounting recipients. Do not change it to a plain string.
 
 ---
 
