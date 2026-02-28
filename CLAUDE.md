@@ -78,6 +78,7 @@ Do not reformat or restyle existing code. Match the surrounding style when addin
 - Entry point: `await begin()` at the bottom of the file.
 - Authentication flow: OTP verification → session UUID assignment → Socket.IO event handlers.
 - Wild Apricot API: OAuth2 client credentials, token cached in `ATkn` with auto-expiry.
+- `Debug` flag (default `0`): when non-zero, enables router debug logging, logs client list on new connections, and attaches raw API responses to event data as `evm.raw`.
 - Email: Nodemailer transport via Gmail SMTP on port 587.
 - File upload: Custom binary format — 4-byte header length (uint32 LE), JSON header array, concatenated file data.
 - All `sendForm` inputs are validated server-side with regex patterns and type checks before email is composed.
@@ -90,7 +91,8 @@ Do not reformat or restyle existing code. Match the surrounding style when addin
 - Two-step submit: first click generates PDF preview, second click uploads receipts + submits form data.
 - `EvData` holds the currently loaded event (null in ad-hoc mode).
 - `PdfData` holds the generated PDF buffer (falsy until preview is generated).
-- `SData` holds session state (id, version, connected flag).
+- `SData` holds session state (`id`, `v` version, `c` connected flag). The `c` flag gates first-connect logic (e.g., URL auto-fill) so it only runs once.
+- `QData` holds parsed URL query parameters from `location.search`. If `QData.id` is present, the form auto-fills from that event ID on first connect.
 - `rstForm()` resets the submit state when any field is modified after preview.
 
 ### Validation Patterns
