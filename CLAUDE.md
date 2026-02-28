@@ -81,7 +81,7 @@ Do not reformat or restyle existing code. Match the surrounding style when addin
 - Email: Nodemailer transport via Gmail SMTP on port 587.
 - File upload: Custom binary format — 4-byte header length (uint32 LE), JSON header array, concatenated file data.
 - All `sendForm` inputs are validated server-side with regex patterns and type checks before email is composed.
-- The `ack` function is the standard response mechanism: `ack(socket, eventName, errorOrUndefined)`.
+- The `ack` function is the standard response mechanism: `ack(socket, eventType, dataOrError)`. If the third argument is a string, it's an error; otherwise (object, `undefined`, etc.) it's a success. The client receives `('ack', eventType, booleanSuccess, dataOrError)`.
 
 ### Client (`root/form.js`)
 
@@ -118,7 +118,7 @@ These patterns are enforced both client-side (via `charPat` keystroke filtering)
 
 - **Changing validation patterns**: The regex patterns in `server.js` and the `charPattern` attributes in `index.html` must stay in sync. A mismatch means the client allows characters the server rejects (or vice versa).
 - **Socket.IO event names**: Both client and server reference event names as strings (`'getEvent'`, `'sendForm'`, `'ack'`). Renaming one side without the other silently breaks communication.
-- **The `ack` convention**: When `stat` is a string (truthy error message), it's an error. When `stat` is `undefined`, it's success. Do not pass `true` or other truthy values as error messages.
+- **The `ack` convention**: When the third argument to `ack()` is a string, it's treated as an error. Any non-string value (including `undefined` or an object like the event data) is a success. On success, the data is forwarded to the client. Do not pass non-string truthy values as error indicators.
 - **`EvLoad` flag**: Only one event can be loaded at a time. This is intentional to prevent concurrent Wild Apricot API calls.
 - **`rData` on socket**: Receipt upload data is stored directly on the socket object (`sck.rData`). It is consumed and deleted on form submission.
 - **Test email detection**: If the instructor email is `test@example.com`, the email subject is prefixed with `<<FORMBOT_TEST>>`. Do not remove this.
