@@ -113,7 +113,7 @@ async function getEvData(ev) {
 	for(let r of rt) evm.fRaw = Math.max(r.BasePrice||0, evm.fRaw);
 	evm.fee=evm.fRaw?utils.formatCost(evm.fRaw):"Free";
 	//RSVP:
-	for(let u of dr) {
+	for(let i=0,u; i<dr.length; i++) { u=dr[i];
 		try {u=await getEvUser(u,hd)} catch(e) {throw "User["+i+"] "+e}
 		if(u.h) evm.hosts.push(u); else evm.rsvp.push(u);
 	}
