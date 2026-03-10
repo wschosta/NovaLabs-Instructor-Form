@@ -113,11 +113,11 @@ async function getEvData(ev) {
 	//Fee Info:
 	for(let r of rt) evm.fRaw = Math.max(r.BasePrice||0, evm.fRaw);
 	evm.fee=evm.fRaw?utils.formatCost(evm.fRaw):"Free";
-	//RSVP:
-	for(let i=0,u; i<dr.length; i++) {
-		u=dr[i]; try {u=await getEvUser(u,hd)} catch(e) {throw "User["+i+"] "+e}
-		if(u.h) evm.hosts.push(u); else evm.rsvp.push(u);
-	}
+	//RSVP: Fetch all contacts in parallel for performance
+	let users = await Promise.all(dr.map((u,i) =>
+		getEvUser(u,hd).catch(e => {throw "User["+i+"] "+e})
+	));
+	for(let u of users) if(u.h) evm.hosts.push(u); else evm.rsvp.push(u);
 	evm.yes -= evm.hosts.length; //Exclude instructors from attendee count
 	if(!evm.hosts.length) evm.hosts.push({name:"???",email:''});
 	if(Debug) evm.raw=[d,dr];
