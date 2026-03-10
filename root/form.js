@@ -121,7 +121,7 @@ function formLoad() {
 			}
 		}
 		Socket.on('ack', (ev, stat, e) => {
-			console.log(`ACK ${stat?'true':'false'}: ${ev,e?e:''}`);
+			console.log(`ACK ${stat?'true':'false'}: ${ev} ${e||''}`);
 			if(!stat) {
 				showInfo(`Server Error: ${e||'{UNKNOWN}'}`);
 				if(ev == 'sendForm') {
