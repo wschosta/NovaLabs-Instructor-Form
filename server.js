@@ -162,19 +162,20 @@ function startServer() {
 			const sck = Cli[utils.fromQuery(req.url.slice(8)).id];
 			if(!sck) return httpErr(0, res, 401, "Bad ID");
 			delete sck.rData; //Clear any previous upload before accepting new one
-			//Read data
-			let buf;
+			//Read data: collect chunks, concat once at end to avoid O(n²) reallocation
+			let chunks=[], total=0;
 			req.on('data', b => {
-				if((buf?buf.length:0)+b.length > MaxUpload) {
+				total += b.length;
+				if(total > MaxUpload) {
 					req.removeAllListeners();
 					return httpErr(sck, res, 413, "File(s) too large");
 				}
-				buf = buf?Buffer.concat([buf,b]):b;
+				chunks.push(b);
 			});
 			req.on('end', () => {try {
 				//Parse header
-				if(!buf) throw "No data";
-				let ofs = buf.readUint32LE(0), f, n;
+				if(!chunks.length) throw "No data";
+				let buf=Buffer.concat(chunks,total), ofs = buf.readUint32LE(0), f, n;
 				if(!ofs || ofs >= buf.length) throw `Bad header len ${ofs}`;
 				ofs += 4;
 				const hdr = JSON.parse(buf.toString('utf8', 4, ofs));
