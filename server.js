@@ -294,16 +294,17 @@ function initCli(sck) {
 
 		//Send Emails
 		//Send to: accounting relay + instructor; also membership relay if sign-off type
-		let al=AccAddr.slice(),ok=0; al.push(uMail);
+		let al=AccAddr.slice(),ok=0,done=0; al.push(uMail);
 		if(sType) al.push(MemAddr);
-		for(let i in al) {
-			let a=al[i]; console.log("-",C.yellow(a));
+		for(let a of al) {
+			console.log("-",C.yellow(a));
 			Mailer.sendMail({
 				from:MailHost, to:a, subject:sb, text:MsgHeader+NoHTML, html:`<body style='${MsgStyle}'><p><b>${MsgHeader}</b></p>${ev+aTab}<br>Formbot ${VER} by <a href='https://github.com/pecacheu'>Pecacheu</a></body>`, attachments:atList
 			}, (e,r) => {
-				if(e) { tStop(); return ack(sck,EV,`Failed to send to ${a}: `+e); }
+				if(done) return; //Prevent duplicate ack after error
+				if(e) { done=1; tStop(); return ack(sck,EV,`Failed to send to ${a}: `+e); }
 				sck.cliLog('yellow',a+": Email sent!"); console.log("REPLY:",r.response);
-				if(ok >= al.length-1) { tStop(); ack(sck,EV); } else ok++;
+				if(++ok >= al.length) { done=1; tStop(); ack(sck,EV); }
 			});
 		}
 	});
