@@ -3,11 +3,15 @@
 'use strict';
 let FormType="Instructor Formbot";
 let DB, DS, BDF, Socket, SData={}, QData, StatMsg, PdfData, PdfSub, EvData;
+//DB=document.body, DS=body.style, BDF=backdrop-filter support
+//SData: {id:sessionUUID, v:serverVersion, c:connectedOnce}
+//PdfData: generated PDF buffer (falsy until preview), PdfSub: submit-in-progress flag
+//EvData: loaded event object (null in ad-hoc mode)
 
 //---------------------------------------- Background Animation ----------------------------------------
 
-const BgSize=400, BgSpd=10/1000, OCMax=255<<24;
-let Blur,bgPos=0,bSkp=0,bTs,bgGPU;
+const BgSize=400, BgSpd=10/1000, OCMax=255<<24; //OCMax: opaque alpha mask for Uint32 pixel ops
+let Blur,bgPos=0,bSkp=0,bTs,bgGPU; //bSkp: 0=idle, increments on focus, 1=triggers redraw then resets
 
 window.onblur = () => {Blur=1}
 window.onfocus = () => {Blur=0}
@@ -138,7 +142,7 @@ function initLayout() {
 	utils.numField(fCount,0,200); utils.numField(fRate,0,100); fRate.set(30);
 	utils.numField(fCost,0,null,null,'$'); utils.numField(fMatCost,0,null,null,'$');
 	fCount.onblur = () => {
-		let n=fCount.num+1; if(n) {
+		let n=fCount.num+1; if(n) { //+1 accounts for header row in aTable
 			while(n > aTable.childElementCount) layoutMakeRow();
 			while(n < aTable.childElementCount) layoutRemRow();
 		}
@@ -149,7 +153,7 @@ function initLayout() {
 		let p=fAdc.value=='p'; fAdc.parentNode.hidden=fTitle.disabled=p&&EvData;
 		fType.disabled=fDate.disabled=fCost.disabled=p; clsData.hidden=0;
 	}
-	(fPay.onchange = () => {
+	(fPay.onchange = () => { //IIFE: set handler and invoke immediately to init label
 		Pem.textContent = (fPay.value=='pap'?"PayPal ":'')+"Email";
 	})();
 	fCost.onnuminput = () => {
@@ -199,7 +203,7 @@ function initLayout() {
 function charPat(f,p) {
 	if(!p) return;
 	p=new RegExp(p); f.addEventListener('keypress',e => {
-		let k=e.key; if(k.length==1 && !p.test(k)) e.preventDefault();
+		let k=e.key; if(k.length==1 && !p.test(k)) e.preventDefault(); //length==1 skips special keys (Enter, Backspace, etc.)
 	});
 }
 
@@ -257,7 +261,7 @@ function genEvent(ev,e) {
 	utils.setDateTime(fDate, ev.d=new Date(ev.dRaw));
 	evApply(); fAdc.onchange();
 }
-const nCont=s => EvData._ln.indexOf(s)!=-1;
+const nCont=s => EvData._ln.indexOf(s)!=-1; //Check if lowercased event name contains substring
 function evApply() {
 	fTitle.value=EvData.name; utils.setDateTime(fDate, EvData.d);
 	let h=EvData.hosts[0]; fName.value=h.name; fAdc.value='p';
@@ -287,7 +291,7 @@ async function sendReceipts() {
 			fHdr.push({n:f.name, t:f.type, l});
 			fDat.push(b), len += l;
 		}
-		//Parse to binary
+		//Pack binary: [4-byte header len (uint32 LE)][JSON header array][concatenated file data]
 		fHdr = new TextEncoder().encode(JSON.stringify(fHdr));
 		f = new Uint32Array([l = fHdr.byteLength]), l += 4;
 		let data = new Uint8Array(l + len);
@@ -327,7 +331,7 @@ function genPdf() {
 	if(fR<0 || fR>100) return "NovaLabs Rate";
 
 	//Read Attendee List:
-	let a=aTable.children,sl=[],rt=0; aTable.sl=sl;
+	let a=aTable.children,sl=[],rt=0; aTable.sl=sl; //sl stored on DOM element for sendForm access
 	if(a.length-1 !== fS) return "List Size must equal Student Count";
 	for(let i=1,l=a.length,s,n,r,u,p; i<l; i++) {
 		s=a[i].children; n=s[0].firstChild.value, u=s[1].firstChild.value,
@@ -340,7 +344,7 @@ function genPdf() {
 		pdf.setFontSize(24); pdf.setTextColor(cMain); pdf.text(xOff,y,name+':');
 		pdf.setFontSize(20); pdf.setTextColor(c||cData); pdf.text(xOff+2.2,y,val);
 	}
-	function multiColor(y) {
+	function multiColor(y) { //Varargs: alternating (color, text) pairs at y position
 		for(let i=1,l=arguments.length,c,t,off=xOff; i+1<l; i+=2) {
 			c=arguments[i], t=String(arguments[i+1]);
 			pdf.setTextColor(c); pdf.text(off,y,t);
@@ -357,7 +361,7 @@ function genPdf() {
 	pdfLine(4,'Payment',fP);
 	pdfLine(4.5,'Email',fM,cMail);
 
-	//Cost Breakdown:
+	//Cost Breakdown: p=profit (revenue-materials), t=reimbursement (profit*(1-rate)+materials)
 	let p=utils.formatCost(rt-fMC), t=(rt-fMC)*((100-fR)/100)+fMC, tt=utils.formatCost(t);
 	//Revenue:
 	pdf.setFontSize(20);
@@ -399,7 +403,8 @@ function statusMsg(msg) {
 }
 function showInfo(msg, bg) {
 	console.info(msg); infoBox.textContent=msg;
-	if(!bg) bg='rgba(150,20,0,.8)'; if(BDF) bg=bg.substr(0,bg.lastIndexOf(',')+1)+'.5)';
+	if(!bg) bg='rgba(150,20,0,.8)';
+	if(BDF) bg=bg.substr(0,bg.lastIndexOf(',')+1)+'.5)'; //Reduce opacity when backdrop-filter blurs behind
 	let es=infoBox.style; es.background=bg, es.transition=null, es.opacity=0;
 	setTimeout(() => {es.transition='opacity .5s ease-out', es.opacity=1},0);
 }
