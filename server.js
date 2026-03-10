@@ -28,6 +28,7 @@ Otp=new OTP(),
 //Filter Patterns
 pTitle=/^[\w\-:.<>()[\]&*%!', ]+$/, pText=/^[\w\+\-()'. ]+$/,
 pEmail=/^\w+(?:[\.+-]\w+)*@\w+(?:[\.-]\w+)*\.\w\w+$/, pDate=/^[\w,: ]+$/,
+okMime={'application/pdf':1,'image/png':1,'image/jpeg':1},
 
 //Schemas
 RHdrFmt={t:'list',f:{
@@ -177,6 +178,8 @@ function startServer() {
 				ofs += 4;
 				const hdr = JSON.parse(buf.toString('utf8', 4, ofs));
 				schema.checkType(hdr, RHdrFmt);
+				if(!hdr.length) throw "No files";
+				for(f of hdr) if(!okMime[f.t]) throw `Invalid type '${f.t}'`;
 				//Split data
 				for(f of hdr) {
 					n = ofs + f.l;
