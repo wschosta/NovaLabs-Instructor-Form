@@ -290,7 +290,7 @@ async function sendReceipts() {
 		let data = new Uint8Array(l + len);
 		data.set(new Uint8Array(f.buffer));
 		data.set(fHdr, 4);
-		for(f of fDat) data.set(fDat, l), l += f.byteLength;
+		for(f of fDat) data.set(f, l), l += f.byteLength;
 		//Upload
 		const r=await fetch(new Request(`/upload?id=${SData.id}`, {method:'POST', body:data}));
 		f=await r.text();
