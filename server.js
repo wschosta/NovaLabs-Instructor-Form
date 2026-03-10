@@ -196,7 +196,8 @@ function startServer() {
 	});
 	//Init Socket.io
 	new io(srv).on('connection', sck => {
-		sck.adr = sck.handshake.address.substr(7); //TODO Always blank
+		let adr=sck.handshake.address||'';
+		sck.adr = adr.startsWith('::ffff:')?adr.slice(7):adr;
 		console.log(C.cyan("[SCK] New client"));
 		sck.on('disconnect', () => {
 			console.log(C.red("[SCK] Connection dropped during init"));
