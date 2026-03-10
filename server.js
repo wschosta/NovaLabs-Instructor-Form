@@ -277,7 +277,7 @@ function initCli(sck) {
 		}
 
 		sck.cliLog('yellow',`(${EV}) Submitting '${title}'...`);
-		let t=setTimeout(() => ack(sck,EV,"Failed to send email: Timed out!"), SendTimeout);
+		let t=setTimeout(() => {done=1; ack(sck,EV,"Failed to send email: Timed out!")}, SendTimeout);
 		function tStop() {if(t) clearTimeout(t),t=0}
 
 		//Embedded Event
