@@ -273,13 +273,16 @@ function evApply() {
 	else fType.value='mkr';
 }
 
+const okTypes=['application/pdf','image/png','image/jpeg'];
 async function sendReceipts() {
 	if(!fMatCost.num) return;
 	try {
 		let fl=fMatFiles.files, fHdr=[], fDat=[], f, b, l, len=0;
+		if(!fl.length) throw "No receipt files selected";
 		console.log("Files", fl);
 		//Read data
 		for(f of fl) {
+			if(!okTypes.includes(f.type)) throw `Invalid file type '${f.type}' for ${f.name}. Only PDF, PNG, and JPEG are accepted.`;
 			b=await f.bytes(), l=b.byteLength;
 			fHdr.push({n:f.name, t:f.type, l});
 			fDat.push(b), len += l;
