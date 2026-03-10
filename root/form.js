@@ -407,7 +407,7 @@ function statusMsg(msg) {
 function showInfo(msg, bg) {
 	console.info(msg); infoBox.textContent=msg;
 	if(!bg) bg='rgba(150,20,0,.8)';
-	if(BDF) bg=bg.substr(0,bg.lastIndexOf(',')+1)+'.5)'; //Reduce opacity when backdrop-filter blurs behind
+	if(BDF) bg=bg.slice(0,bg.lastIndexOf(',')+1)+'.5)'; //Reduce opacity when backdrop-filter blurs behind
 	let es=infoBox.style; es.background=bg, es.transition=null, es.opacity=0;
 	setTimeout(() => {es.transition='opacity .5s ease-out', es.opacity=1},0);
 }

@@ -109,7 +109,7 @@ async function getEvData(ev) {
 	};
 	//Date & Time:
 	let dt=utils.formatDate(new Date(evm.dRaw)), ds=dt.indexOf(' ',6);
-	evm.time=dt.substr(0,ds), evm.date=dt.substr(ds+1);
+	evm.time=dt.slice(0,ds), evm.date=dt.slice(ds+1);
 	//Fee Info:
 	for(let r of rt) evm.fRaw = Math.max(r.BasePrice||0, evm.fRaw);
 	evm.fee=evm.fRaw?utils.formatCost(evm.fRaw):"Free";
@@ -287,7 +287,7 @@ function initCli(sck) {
 		let sb = (uMail=='test@example.com'?"<<FORMBOT_TEST>>":"FormBot: ")+title+" on "+date,
 		aTab = aList.length?(sType==2?"<p style='color:#f00'><b>No NovaPass or tool sign off. Safety Sign-Off Only.</b></p>":'')+(cMat?"Materials: "+utils.formatCost(cMat):'')+"<p>Event Attendee List:</p>"+genTable(aList):'',
 		atp = title.indexOf('-'),
-		atList = [{filename:title.substr(0,atp==-1?title.length:atp).replace(/\s/g,'')+'.pdf', contentType:router.types['.pdf'], content:pdf}];
+		atList = [{filename:title.slice(0,atp==-1?title.length:atp).replace(/\s/g,'')+'.pdf', contentType:router.types['.pdf'], content:pdf}];
 
 		//Receipts
 		if(rData) for(let r of rData) atList.push({filename:r.n, contentType:r.t, content:r.d});
@@ -369,7 +369,7 @@ function runInput() {
 	console.log("Type 'list' to list clients or 'q' to quit.");
 	process.stdin.resume(); process.stdin.setEncoding('utf8');
 	process.stdin.on('data', cmd => {
-		for(let s; (s=cmd.search(/[\n\r]/)) != -1;) cmd=cmd.substring(0,s);
+		for(let s; (s=cmd.search(/[\n\r]/)) !== -1;) cmd=cmd.slice(0,s);
 		if(cmd == 'exit' || cmd == 'q') {
 			console.log(C.magenta("Exiting..."));
 			process.exit();
