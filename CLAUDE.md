@@ -78,10 +78,11 @@ Do not reformat or restyle existing code. Match the surrounding style when addin
 - Entry point: `await begin()` at the bottom of the file.
 - Authentication flow: OTP verification → session UUID assignment → Socket.IO event handlers.
 - Wild Apricot API: OAuth2 client credentials, token cached in `ATkn` with auto-expiry.
+- `Debug` flag (default `0`): when non-zero, enables router debug logging, logs client list on new connections, and attaches raw API responses to event data as `evm.raw`.
 - Email: Nodemailer transport via Gmail SMTP on port 587.
 - File upload: Custom binary format — 4-byte header length (uint32 LE), JSON header array, concatenated file data.
 - All `sendForm` inputs are validated server-side with regex patterns and type checks before email is composed.
-- The `ack` function is the standard response mechanism: `ack(socket, eventName, errorOrUndefined)`.
+- The `ack` function is the standard response mechanism: `ack(socket, eventType, dataOrError)`. If the third argument is a string, it's an error; otherwise (object, `undefined`, etc.) it's a success. The client receives `('ack', eventType, booleanSuccess, dataOrError)`.
 
 ### Client (`root/form.js`)
 
@@ -90,7 +91,8 @@ Do not reformat or restyle existing code. Match the surrounding style when addin
 - Two-step submit: first click generates PDF preview, second click uploads receipts + submits form data.
 - `EvData` holds the currently loaded event (null in ad-hoc mode).
 - `PdfData` holds the generated PDF buffer (falsy until preview is generated).
-- `SData` holds session state (id, version, connected flag).
+- `SData` holds session state (`id`, `v` version, `c` connected flag). The `c` flag gates first-connect logic (e.g., URL auto-fill) so it only runs once.
+- `QData` holds parsed URL query parameters from `location.search`. If `QData.id` is present, the form auto-fills from that event ID on first connect.
 - `rstForm()` resets the submit state when any field is modified after preview.
 
 ### Validation Patterns
@@ -118,10 +120,13 @@ These patterns are enforced both client-side (via `charPat` keystroke filtering)
 
 - **Changing validation patterns**: The regex patterns in `server.js` and the `charPattern` attributes in `index.html` must stay in sync. A mismatch means the client allows characters the server rejects (or vice versa).
 - **Socket.IO event names**: Both client and server reference event names as strings (`'getEvent'`, `'sendForm'`, `'ack'`). Renaming one side without the other silently breaks communication.
-- **The `ack` convention**: When `stat` is a string (truthy error message), it's an error. When `stat` is `undefined`, it's success. Do not pass `true` or other truthy values as error messages.
+- **The `ack` convention**: When the third argument to `ack()` is a string, it's treated as an error. Any non-string value (including `undefined` or an object like the event data) is a success. On success, the data is forwarded to the client. Do not pass non-string truthy values as error indicators.
 - **`EvLoad` flag**: Only one event can be loaded at a time. This is intentional to prevent concurrent Wild Apricot API calls.
 - **`rData` on socket**: Receipt upload data is stored directly on the socket object (`sck.rData`). It is consumed and deleted on form submission.
 - **Test email detection**: If the instructor email is `test@example.com`, the email subject is prefixed with `<<FORMBOT_TEST>>`. Do not remove this.
+- **Session timeout duplication**: The 4-hour session lifetime is hardcoded in both `server.js` (`IDTimeout=4*3600000`) and `form.js` (cookie `maxAge=4*3600`). These must stay in sync.
+- **`sType` integer values**: Class type is sent as an integer — `0` = Project (no sign-off), `1` = Tool Sign-Off, `2` = Safety Sign-Off. When `sType > 0`, the membership relay address is included in the email recipients.
+- **`AccAddr` is an array**: The accounting address constant is an array (`AccAddr.slice()` is called before appending), allowing multiple accounting recipients. Do not change it to a plain string.
 
 ---
 
