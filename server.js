@@ -311,13 +311,14 @@ function initCli(sck) {
 
 function tyS(v) {return typeof v != 'string'}
 function tyN(v) {return typeof v != 'number'}
+function esc(s) {return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;')}
 
 const tStyle='overflow:hidden;max-width:1000px;color:#888;border-radius:10px;width:100%;border-collapse:collapse;background:#f5f5f5;box-shadow:2px 2px 2px rgba(0,0,0,0.3);font-size:16px;table-layout:fixed', tdStyle='border-top:1px solid #eee;padding:9px 12px;line-height:15px;white-space:nowrap;text-overflow:ellipsis;overflow:hidden', trFirstStyle='border-top:none;background:#eee', trEvenStyle="style='background:#dcdcdc'", nameStyle='font-weight:700', mailStyle='color:#5299e2;font-weight:500', userStyle='text-align:right';
 
 function genTable(tb) {
 	let lh=''; function makeRow(a,i) {
-		if(!a[2]) a[2]=''; lh += "<tr "+(i%2?'':trEvenStyle)+"><td style='"+tdStyle+';'+nameStyle+"'>"+a[0]+"</td>"+
-		"<td style='"+tdStyle+';'+mailStyle+"'>"+a[1]+"</td><td style='"+tdStyle+';'+userStyle+"'>"+a[2]+"</td></tr>";
+		if(!a[2]) a[2]=''; lh += "<tr "+(i%2?'':trEvenStyle)+"><td style='"+tdStyle+';'+nameStyle+"'>"+esc(a[0])+"</td>"+
+		"<td style='"+tdStyle+';'+mailStyle+"'>"+esc(a[1])+"</td><td style='"+tdStyle+';'+userStyle+"'>"+esc(a[2])+"</td></tr>";
 	}
 	for(let i=0,l=tb.length; i<l; ++i) makeRow(tb[i],i);
 	return "<table style='"+tStyle+"'><tr style='"+trFirstStyle+
@@ -331,12 +332,12 @@ function genEvent(ev, host) {
 	try {
 		let eh=ev.hosts, hc="", chgHost=1;
 		for(let i=0,l=eh.length,n; i<l; ++i) {
-			n=eh[i].name;
-			hc+=(i?', ':'')+`<a href='${ev.link}' target='_blank' style='${muLink+muVen}'>${n}</a>`;
-			if(host == n) chgHost=0;
+			n=esc(eh[i].name);
+			hc+=(i?', ':'')+`<a href='${esc(ev.link)}' target='_blank' style='${muLink+muVen}'>${n}</a>`;
+			if(host == eh[i].name) chgHost=0;
 		}
-		if(host && chgHost) hc=host+` (Originally ${hc})`;
-		return `<p>Formbot thinks this event is:</p><div style='${muEvent}'><a style='${muLink+muTitle}' href='${ev.link}' target='_blank'>${ev.name}</a><div style='${muDetail}'><a style='${muLink+muVen}' href='${ev.link}' target='_blank'>${ev.ven}</a><div style='${muSub}'>${ev.loc}</div><div style='${muDesc}'>${ev.desc}</div></div><div style='${muMeta}'><div style='${muSub+';margin-bottom:6px'}'>100% Match</div><div>${ev.time}</div><div style='${muSub}'>${ev.date}</div><div style='${muRSVP}'>${ev.yes} Attendees<br>${ev.wait} Waitlist</div><div style='margin-top:6px'>${ev.fee}</div></div><div style='${muHosts}'>Hosted By: ${hc}</div></div>`;
+		if(host && chgHost) hc=esc(host)+` (Originally ${hc})`;
+		return `<p>Formbot thinks this event is:</p><div style='${muEvent}'><a style='${muLink+muTitle}' href='${esc(ev.link)}' target='_blank'>${esc(ev.name)}</a><div style='${muDetail}'><a style='${muLink+muVen}' href='${esc(ev.link)}' target='_blank'>${esc(ev.ven)}</a><div style='${muSub}'>${esc(ev.loc)}</div><div style='${muDesc}'>${esc(ev.desc)}</div></div><div style='${muMeta}'><div style='${muSub+';margin-bottom:6px'}'>100% Match</div><div>${esc(ev.time)}</div><div style='${muSub}'>${esc(ev.date)}</div><div style='${muRSVP}'>${ev.yes} Attendees<br>${ev.wait} Waitlist</div><div style='margin-top:6px'>${esc(ev.fee)}</div></div><div style='${muHosts}'>Hosted By: ${hc}</div></div>`;
 	} catch(e) { return [e.toString()]; }
 }
 
@@ -370,7 +371,7 @@ function runInput() {
 function httpErr(sck, res, code, msg) {
 	const e = `Upload Code ${code}: ${msg}`;
 	if(sck) sck.cliErr(e); else console.error(e);
-	res.writeHead(code,''), res.write(`<pre style='font-size:16pt'>${msg}</pre>`), res.end();
+	res.writeHead(code,''), res.write(`<pre style='font-size:16pt'>${esc(msg)}</pre>`), res.end();
 }
 
 await begin();
