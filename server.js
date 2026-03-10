@@ -14,7 +14,7 @@ import router from 'raiutils/router';
 import schema from 'raiutils/schema';
 import 'raiutils';
 
-let Cli={}, SrvIp, Mailer;
+let Cli={}, SrvIp, Mailer; //Cli: active sessions keyed by UUID
 
 //Config Options
 const Debug=0, Port=8080, SendTimeout=15000, ReqTimeout=5000,
@@ -49,7 +49,7 @@ MemAddr='formbot-membership-relay@nova-labs.org',
 //Auth Keys
 AuthUri="https://oauth.wildapricot.org/auth/token",
 ApiUri="https://api.wildapricot.org/v2/accounts/";
-let ATkn,AUsr,EvLoad,SrvOpt;
+let ATkn,AUsr,EvLoad,SrvOpt; //ATkn: WA access token, AUsr: WA account ID, EvLoad: mutex for WA API calls
 
 try {SrvOpt={key:fs.readFileSync(Conf.key), cert:fs.readFileSync(Conf.cert)}}
 catch(e) {console.log(C.dim("Warning: Could not load certificates! HTTPS disabled"))}
@@ -118,7 +118,7 @@ async function getEvData(ev) {
 		u=dr[i]; try {u=await getEvUser(u,hd)} catch(e) {throw "User["+i+"] "+e}
 		if(u.h) evm.hosts.push(u); else evm.rsvp.push(u);
 	}
-	evm.yes -= evm.hosts.length;
+	evm.yes -= evm.hosts.length; //Exclude instructors from attendee count
 	if(!evm.hosts.length) evm.hosts.push({name:"???",email:''});
 	if(Debug) evm.raw=[d,dr];
 	return evm;
@@ -135,7 +135,7 @@ async function getEvUser(u,hd) {
 	let c=JSON.parse(await httpsReq(ApiUri+AUsr+"/contacts/"+u.Contact.Id, 'GET', hd));
 	return {name:(fn||'')+(fn&&ln?' ':'')+(ln||''), email:em, id:u.Contact.Id, fee:u.PaidSum||0,
 		level:c.MembershipLevel?c.MembershipLevel.Name:null,
-		h:t.Name.toLowerCase().startsWith("5. instructor")};
+		h:t.Name.toLowerCase().startsWith("5. instructor")}; //WA convention: instructor reg types prefixed "5."
 }
 
 function httpsReq(uri, mt, hdr, rb) {
@@ -145,7 +145,7 @@ function httpsReq(uri, mt, hdr, rb) {
 		}).on('error', rEnd);
 		if(rb) rq.write(rb); rq.end();
 		tt=setTimeout(() => rEnd(Error("Timed Out")), ReqTimeout);
-		function rEnd(e) {
+		function rEnd(e) { //May fire from 'end', 'error', or timeout; rq.ee guards against double-resolve
 			if(rq.ee) return; if(e) rq.destroy(); rq.ee=1; clearTimeout(tt);
 			if(e) rej(e);
 			else if(re.statusCode != 200) rej(Error("Code "+re.statusCode+(dat?" "+dat:'')+" "+uri));
@@ -161,7 +161,7 @@ function startServer() {
 			//ID check
 			const sck = Cli[utils.fromQuery(req.url.slice(8)).id];
 			if(!sck) return httpErr(0, res, 401, "Bad ID");
-			delete sck.rData;
+			delete sck.rData; //Clear any previous upload before accepting new one
 			//Read data
 			let buf;
 			req.on('data', b => {
@@ -190,7 +190,7 @@ function startServer() {
 				if(buf.length !== ofs) throw `Payload length mismatch ${buf.length} != ${ofs}`;
 				sck.cliLog('magenta', "Upload");
 				console.log(hdr);
-				sck.rData = hdr;
+				sck.rData = hdr; //Stored on socket, consumed by sendForm handler
 				res.end("OK");
 			} catch(e) {httpErr(sck, res, 400, `Receipts ${e}`)}});
 		} else router.handle(Web, req, res, VDir);
@@ -238,7 +238,7 @@ function startServer() {
 function initCli(sck) {
 	Cli[sck.uid] = sck;
 	if(Debug) logClientList();
-	sck.removeAllListeners();
+	sck.removeAllListeners(); //Replace init-phase handlers with authenticated handlers
 
 	sck.on('getEvent', ev => {
 		const EV='getEvent';
@@ -262,13 +262,13 @@ function initCli(sck) {
 		if(cMat && !rData) return ack(sck,EV,"Receipts required if materialCost > $0");
 		if(pdf.length > 20000) return ack(sck,EV,"Pdf exceeded max size 20KB");
 		if(!Array.isArray(aList) || aList.length > 200) return ack(sck,EV,"Bad input: attendeeList");
-		if(sType !== 0 && sType !== 1 && sType !== 2) return ack(sck,EV,"Bad input: sType");
+		if(sType !== 0 && sType !== 1 && sType !== 2) return ack(sck,EV,"Bad input: sType"); //0=project, 1=tool sign-off, 2=safety sign-off
 		if(sType && !aList.length) return ack(sck,EV,"Bad input: sType");
 
 		//Attendee List Error Checking
 		for(let i=0,a,e=0,l=aList.length; i<l; ++i) {
 			a=aList[i]; if(a.length !== 4) e="Invalid Length";
-			a.splice(0,2,a[0]+a[1]);
+			a.splice(0,2,a[0]+a[1]); //Merge [first,last,level,price] -> [fullname,level,price]
 			if(tyS(a[0]) || a[0].length > 80 || !pText.test(a[0])) e="Name Invalid";
 			if(tyS(a[1]) || a[1].length > 40 || !pText.test(a[1])) e="Level Invalid";
 			if(tyS(a[2]) || a[2].length > 15 || (a[2] && !/^[\w$.,\- ]+$/.test(a[2]))) e="Price Invalid";
@@ -280,7 +280,7 @@ function initCli(sck) {
 		function tStop() {if(t) clearTimeout(t),t=0}
 
 		//Embedded Event
-		let ev = genEvent(sck.evm,uName);
+		let ev = genEvent(sck.evm,uName); //Returns HTML string on success, array on error
 		if(tyS(ev)) return ack(sck,EV,"Error generating event data: "+ev[0]);
 
 		let sb = (uMail=='test@example.com'?"<<FORMBOT_TEST>>":"FormBot: ")+title+" on "+date,
@@ -292,6 +292,7 @@ function initCli(sck) {
 		if(rData) for(let r of rData) atList.push({filename:r.n, contentType:r.t, content:r.d});
 
 		//Send Emails
+		//Send to: accounting relay + instructor; also membership relay if sign-off type
 		let al=AccAddr.slice(),ok=0; al.push(uMail);
 		if(sType) al.push(MemAddr);
 		for(let i in al) {
@@ -346,6 +347,7 @@ function genEvent(ev, host) {
 	} catch(e) { return [e.toString()]; }
 }
 
+//ack: stat=undefined/object -> success (emit true), stat=string -> error (emit false)
 function ack(sck, eType, stat) {
 	if(tyS(stat)) sck.cliLog('green', "ACK true"), sck.emit('ack', eType, true, stat);
 	else sck.cliErr(`(${eType}) `+stat), sck.emit('ack', eType, false, stat);
