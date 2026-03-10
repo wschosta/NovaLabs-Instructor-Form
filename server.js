@@ -190,7 +190,7 @@ function startServer() {
 				}
 				if(buf.length !== ofs) throw `Payload length mismatch ${buf.length} != ${ofs}`;
 				sck.cliLog('magenta', "Upload");
-				console.log(hdr);
+				if(Debug) console.log(hdr);
 				sck.rData = hdr; //Stored on socket, consumed by sendForm handler
 				res.end("OK");
 			} catch(e) {httpErr(sck, res, 400, `Receipts ${e}`)}});
@@ -303,7 +303,7 @@ function initCli(sck) {
 			}, (e,r) => {
 				if(done) return; //Prevent duplicate ack after error
 				if(e) { done=1; tStop(); return ack(sck,EV,`Failed to send to ${a}: `+e); }
-				sck.cliLog('yellow',a+": Email sent!"); console.log("REPLY:",r.response);
+				sck.cliLog('yellow',a+": Email sent!"); if(Debug) console.log("REPLY:",r.response);
 				if(++ok >= al.length) { done=1; tStop(); ack(sck,EV); }
 			});
 		}

@@ -286,7 +286,7 @@ async function sendReceipts() {
 	try {
 		let fl=fMatFiles.files, fHdr=[], fDat=[], f, b, l, len=0;
 		if(!fl.length) throw "No receipt files selected";
-		console.log("Files", fl);
+		console.debug("Files", fl);
 		//Read data
 		for(f of fl) {
 			if(!okTypes.includes(f.type)) throw `Invalid file type '${f.type}' for ${f.name}. Only PDF, PNG, and JPEG are accepted.`;
