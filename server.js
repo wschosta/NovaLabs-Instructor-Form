@@ -14,7 +14,7 @@ import router from 'raiutils/router';
 import schema from 'raiutils/schema';
 import 'raiutils';
 
-let Cli={}, SrvIp, Mailer; //Cli: active sessions keyed by UUID
+let Cli={}, SrvIp, Mailer;
 
 //Config Options
 const Debug=0, Port=8080, SendTimeout=15000, ReqTimeout=5000,
@@ -28,7 +28,6 @@ Otp=new OTP(),
 //Filter Patterns
 pTitle=/^[\w\-:.<>()[\]&*%!', ]+$/, pText=/^[\w\+\-()'. ]+$/,
 pEmail=/^\w+(?:[\.+-]\w+)*@\w+(?:[\.-]\w+)*\.\w\w+$/, pDate=/^[\w,: ]+$/,
-okMime={'application/pdf':1,'image/png':1,'image/jpeg':1},
 
 //Schemas
 RHdrFmt={t:'list',f:{
@@ -49,7 +48,7 @@ MemAddr='formbot-membership-relay@nova-labs.org',
 //Auth Keys
 AuthUri="https://oauth.wildapricot.org/auth/token",
 ApiUri="https://api.wildapricot.org/v2/accounts/";
-let ATkn,AUsr,EvLoad,SrvOpt; //ATkn: WA access token, AUsr: WA account ID, EvLoad: mutex for WA API calls
+let ATkn,AUsr,EvLoad,SrvOpt;
 
 try {SrvOpt={key:fs.readFileSync(Conf.key), cert:fs.readFileSync(Conf.cert)}}
 catch(e) {console.log(C.dim("Warning: Could not load certificates! HTTPS disabled"))}
@@ -109,16 +108,16 @@ async function getEvData(ev) {
 	};
 	//Date & Time:
 	let dt=utils.formatDate(new Date(evm.dRaw)), ds=dt.indexOf(' ',6);
-	evm.time=dt.slice(0,ds), evm.date=dt.slice(ds+1);
+	evm.time=dt.substr(0,ds), evm.date=dt.substr(ds+1);
 	//Fee Info:
 	for(let r of rt) evm.fRaw = Math.max(r.BasePrice||0, evm.fRaw);
 	evm.fee=evm.fRaw?utils.formatCost(evm.fRaw):"Free";
-	//RSVP: Fetch all contacts in parallel for performance
-	let users = await Promise.all(dr.map((u,i) =>
-		getEvUser(u,hd).catch(e => {throw "User["+i+"] "+e})
-	));
-	for(let u of users) if(u.h) evm.hosts.push(u); else evm.rsvp.push(u);
-	evm.yes -= evm.hosts.length; //Exclude instructors from attendee count
+	//RSVP:
+	for(let i=0,u; i<dr.length; i++) { u=dr[i];
+		try {u=await getEvUser(u,hd)} catch(e) {throw "User["+i+"] "+e}
+		if(u.h) evm.hosts.push(u); else evm.rsvp.push(u);
+	}
+	evm.yes -= evm.hosts.length;
 	if(!evm.hosts.length) evm.hosts.push({name:"???",email:''});
 	if(Debug) evm.raw=[d,dr];
 	return evm;
@@ -135,7 +134,7 @@ async function getEvUser(u,hd) {
 	let c=JSON.parse(await httpsReq(ApiUri+AUsr+"/contacts/"+u.Contact.Id, 'GET', hd));
 	return {name:(fn||'')+(fn&&ln?' ':'')+(ln||''), email:em, id:u.Contact.Id, fee:u.PaidSum||0,
 		level:c.MembershipLevel?c.MembershipLevel.Name:null,
-		h:t.Name.toLowerCase().startsWith("5. instructor")}; //WA convention: instructor reg types prefixed "5."
+		h:t.Name.toLowerCase().startsWith("5. instructor")};
 }
 
 function httpsReq(uri, mt, hdr, rb) {
@@ -145,10 +144,9 @@ function httpsReq(uri, mt, hdr, rb) {
 		}).on('error', rEnd);
 		if(rb) rq.write(rb); rq.end();
 		tt=setTimeout(() => rEnd(Error("Timed Out")), ReqTimeout);
-		function rEnd(e) { //May fire from 'end', 'error', or timeout; rq.ee guards against double-resolve
+		function rEnd(e) {
 			if(rq.ee) return; if(e) rq.destroy(); rq.ee=1; clearTimeout(tt);
-			if(e) rej(e);
-			else if(re.statusCode !== 200) rej(Error("Code "+re.statusCode+(dat?" "+dat:'')+" "+uri));
+			if(!e && re.statusCode != 200) rej(Error("Code "+re.statusCode+(dat?" "+dat:'')+" "+uri));
 			else res(dat);
 		}
 	});
@@ -161,27 +159,24 @@ function startServer() {
 			//ID check
 			const sck = Cli[utils.fromQuery(req.url.slice(8)).id];
 			if(!sck) return httpErr(0, res, 401, "Bad ID");
-			delete sck.rData; //Clear any previous upload before accepting new one
-			//Read data: collect chunks, concat once at end to avoid O(n²) reallocation
-			let chunks=[], total=0;
+			delete sck.rData;
+			//Read data
+			let buf;
 			req.on('data', b => {
-				total += b.length;
-				if(total > MaxUpload) {
+				if((buf?buf.length:0)+b.length > MaxUpload) {
 					req.removeAllListeners();
 					return httpErr(sck, res, 413, "File(s) too large");
 				}
-				chunks.push(b);
+				buf = buf?Buffer.concat([buf,b]):b;
 			});
 			req.on('end', () => {try {
 				//Parse header
-				if(!chunks.length) throw "No data";
-				let buf=Buffer.concat(chunks,total), ofs = buf.readUint32LE(0), f, n;
+				if(!buf) throw "No data";
+				let ofs = buf.readUint32LE(0), f, n;
 				if(!ofs || ofs >= buf.length) throw `Bad header len ${ofs}`;
 				ofs += 4;
 				const hdr = JSON.parse(buf.toString('utf8', 4, ofs));
 				schema.checkType(hdr, RHdrFmt);
-				if(!hdr.length) throw "No files";
-				for(f of hdr) if(!okMime[f.t]) throw `Invalid type '${f.t}'`;
 				//Split data
 				for(f of hdr) {
 					n = ofs + f.l;
@@ -190,8 +185,8 @@ function startServer() {
 				}
 				if(buf.length !== ofs) throw `Payload length mismatch ${buf.length} != ${ofs}`;
 				sck.cliLog('magenta', "Upload");
-				if(Debug) console.log(hdr);
-				sck.rData = hdr; //Stored on socket, consumed by sendForm handler
+				console.log(hdr);
+				sck.rData = hdr;
 				res.end("OK");
 			} catch(e) {httpErr(sck, res, 400, `Receipts ${e}`)}});
 		} else router.handle(Web, req, res, VDir);
@@ -201,8 +196,7 @@ function startServer() {
 	});
 	//Init Socket.io
 	new io(srv).on('connection', sck => {
-		let adr=sck.handshake.address||'';
-		sck.adr = adr.startsWith('::ffff:')?adr.slice(7):adr;
+		sck.adr = sck.handshake.address.substr(7); //TODO Always blank
 		console.log(C.cyan("[SCK] New client"));
 		sck.on('disconnect', () => {
 			console.log(C.red("[SCK] Connection dropped during init"));
@@ -239,7 +233,7 @@ function startServer() {
 function initCli(sck) {
 	Cli[sck.uid] = sck;
 	if(Debug) logClientList();
-	sck.removeAllListeners(); //Replace init-phase handlers with authenticated handlers
+	sck.removeAllListeners();
 
 	sck.on('getEvent', ev => {
 		const EV='getEvent';
@@ -256,55 +250,52 @@ function initCli(sck) {
 		if(tyS(title) || title.length > 120 || !pTitle.test(title)) return ack(sck,EV,"Bad input: title");
 		if(title.indexOf(':') == -1 || Number(title)) return ack(sck,EV,"Invalid title! Did you mean to auto-fill via class ID? To auto-fill, please select the name field again and press ENTER or ⏎");
 		if(tyS(date) || date.length > 80 || !pDate.test(date)) return ack(sck,EV,"Bad input: date");
-		if(tyS(uName) || uName.length > 80 || !pText.test(uName)) return ack(sck,EV,"Bad input: instructorName");
-		if(tyS(uMail) || uMail.length > 254 || !pEmail.test(uMail)) return ack(sck,EV,"Bad input: instructorMail");
+		if(tyS(uName) || !pText.test(uName)) return ack(sck,EV,"Bad input: instructorName");
+		if(tyS(uMail) || !pEmail.test(uMail)) return ack(sck,EV,"Bad input: instructorMail");
 		if(tyN(cMat) || cMat < 0) return ack(sck,EV,"Bad input: materialCost");
 		if(tyS(pdf) || pdf.length < 1) return ack(sck,EV,"Bad input: pdf");
 		if(cMat && !rData) return ack(sck,EV,"Receipts required if materialCost > $0");
 		if(pdf.length > 20000) return ack(sck,EV,"Pdf exceeded max size 20KB");
 		if(!Array.isArray(aList) || aList.length > 200) return ack(sck,EV,"Bad input: attendeeList");
-		if(sType !== 0 && sType !== 1 && sType !== 2) return ack(sck,EV,"Bad input: sType"); //0=project, 1=tool sign-off, 2=safety sign-off
-		if(sType && !aList.length) return ack(sck,EV,"Bad input: sType");
+		if(!(sType >= 0) || sType && !aList.length) return ack(sck,EV,"Bad input: sType");
 
 		//Attendee List Error Checking
 		for(let i=0,a,e=0,l=aList.length; i<l; ++i) {
 			a=aList[i]; if(a.length !== 4) e="Invalid Length";
-			a.splice(0,2,a[0]+a[1]); //Merge [first,last,level,price] -> [fullname,level,price]
+			a.splice(0,2,a[0]+a[1]);
 			if(tyS(a[0]) || a[0].length > 80 || !pText.test(a[0])) e="Name Invalid";
-			if(tyS(a[1]) || a[1].length > 40 || !pText.test(a[1])) e="Level Invalid";
-			if(tyS(a[2]) || a[2].length > 15 || (a[2] && !/^[\w$.,\- ]+$/.test(a[2]))) e="Price Invalid";
+			if(tyS(a[1]) || a[1].length > 40) e="Level Invalid";
+			if(tyS(a[2]) || a[2].length > 15) e="Price Invalid";
 			if(e) return ack(sck, EV, `Bad input: attendeeList[${i}]: ${e}`);
 		}
 
 		sck.cliLog('yellow',`(${EV}) Submitting '${title}'...`);
-		let t=setTimeout(() => {done=1; ack(sck,EV,"Failed to send email: Timed out!")}, SendTimeout);
+		let t=setTimeout(() => ack(sck,EV,"Failed to send email: Timed out!"), SendTimeout);
 		function tStop() {if(t) clearTimeout(t),t=0}
 
 		//Embedded Event
-		let ev = genEvent(sck.evm,uName); //Returns HTML string on success, array on error
+		let ev = genEvent(sck.evm,uName);
 		if(tyS(ev)) return ack(sck,EV,"Error generating event data: "+ev[0]);
 
 		let sb = (uMail=='test@example.com'?"<<FORMBOT_TEST>>":"FormBot: ")+title+" on "+date,
 		aTab = aList.length?(sType==2?"<p style='color:#f00'><b>No NovaPass or tool sign off. Safety Sign-Off Only.</b></p>":'')+(cMat?"Materials: "+utils.formatCost(cMat):'')+"<p>Event Attendee List:</p>"+genTable(aList):'',
 		atp = title.indexOf('-'),
-		atList = [{filename:title.slice(0,atp==-1?title.length:atp).replace(/\s/g,'')+'.pdf', contentType:router.types['.pdf'], content:pdf}];
+		atList = [{filename:title.substr(0,atp==-1?title.length:atp).replace(/\s/g,'')+'.pdf', contentType:router.types['.pdf'], content:pdf}];
 
 		//Receipts
 		if(rData) for(let r of rData) atList.push({filename:r.n, contentType:r.t, content:r.d});
 
 		//Send Emails
-		//Send to: accounting relay + instructor; also membership relay if sign-off type
-		let al=AccAddr.slice(),ok=0,done=0; al.push(uMail);
+		let al=AccAddr.slice(),ok=0; al.push(uMail);
 		if(sType) al.push(MemAddr);
-		for(let a of al) {
-			console.log("-",C.yellow(a));
+		for(let i in al) {
+			let a=al[i]; console.log("-",C.yellow(a));
 			Mailer.sendMail({
 				from:MailHost, to:a, subject:sb, text:MsgHeader+NoHTML, html:`<body style='${MsgStyle}'><p><b>${MsgHeader}</b></p>${ev+aTab}<br>Formbot ${VER} by <a href='https://github.com/pecacheu'>Pecacheu</a></body>`, attachments:atList
 			}, (e,r) => {
-				if(done) return; //Prevent duplicate ack after error
-				if(e) { done=1; tStop(); return ack(sck,EV,`Failed to send to ${a}: `+e); }
-				sck.cliLog('yellow',a+": Email sent!"); if(Debug) console.log("REPLY:",r.response);
-				if(++ok >= al.length) { done=1; tStop(); ack(sck,EV); }
+				if(e) { tStop(); return ack(sck,EV,`Failed to send to ${a}: `+e); }
+				sck.cliLog('yellow',a+": Email sent!"); console.log("REPLY:",r.response);
+				if(ok >= al.length-1) { tStop(); ack(sck,EV); } else ok++;
 			});
 		}
 	});
@@ -317,16 +308,15 @@ function initCli(sck) {
 	sck.emit('connection', sck.uid, VER);
 }
 
-function tyS(v) {return typeof v !== 'string'}
-function tyN(v) {return typeof v !== 'number'}
-function esc(s) {return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;')}
+function tyS(v) {return typeof v != 'string'}
+function tyN(v) {return typeof v != 'number'}
 
 const tStyle='overflow:hidden;max-width:1000px;color:#888;border-radius:10px;width:100%;border-collapse:collapse;background:#f5f5f5;box-shadow:2px 2px 2px rgba(0,0,0,0.3);font-size:16px;table-layout:fixed', tdStyle='border-top:1px solid #eee;padding:9px 12px;line-height:15px;white-space:nowrap;text-overflow:ellipsis;overflow:hidden', trFirstStyle='border-top:none;background:#eee', trEvenStyle="style='background:#dcdcdc'", nameStyle='font-weight:700', mailStyle='color:#5299e2;font-weight:500', userStyle='text-align:right';
 
 function genTable(tb) {
 	let lh=''; function makeRow(a,i) {
-		if(!a[2]) a[2]=''; lh += "<tr "+(i%2?'':trEvenStyle)+"><td style='"+tdStyle+';'+nameStyle+"'>"+esc(a[0])+"</td>"+
-		"<td style='"+tdStyle+';'+mailStyle+"'>"+esc(a[1])+"</td><td style='"+tdStyle+';'+userStyle+"'>"+esc(a[2])+"</td></tr>";
+		if(!a[2]) a[2]=''; lh += "<tr "+(i%2?'':trEvenStyle)+"><td style='"+tdStyle+';'+nameStyle+"'>"+a[0]+"</td>"+
+		"<td style='"+tdStyle+';'+mailStyle+"'>"+a[1]+"</td><td style='"+tdStyle+';'+userStyle+"'>"+a[2]+"</td></tr>";
 	}
 	for(let i=0,l=tb.length; i<l; ++i) makeRow(tb[i],i);
 	return "<table style='"+tStyle+"'><tr style='"+trFirstStyle+
@@ -340,16 +330,15 @@ function genEvent(ev, host) {
 	try {
 		let eh=ev.hosts, hc="", chgHost=1;
 		for(let i=0,l=eh.length,n; i<l; ++i) {
-			n=esc(eh[i].name);
-			hc+=(i?', ':'')+`<a href='${esc(ev.link)}' target='_blank' style='${muLink+muVen}'>${n}</a>`;
-			if(host == eh[i].name) chgHost=0;
+			n=eh[i].name;
+			hc+=(i?', ':'')+`<a href='${ev.link}' target='_blank' style='${muLink+muVen}'>${n}</a>`;
+			if(host == n) chgHost=0;
 		}
-		if(host && chgHost) hc=esc(host)+` (Originally ${hc})`;
-		return `<p>Formbot thinks this event is:</p><div style='${muEvent}'><a style='${muLink+muTitle}' href='${esc(ev.link)}' target='_blank'>${esc(ev.name)}</a><div style='${muDetail}'><a style='${muLink+muVen}' href='${esc(ev.link)}' target='_blank'>${esc(ev.ven)}</a><div style='${muSub}'>${esc(ev.loc)}</div><div style='${muDesc}'>${esc(ev.desc)}</div></div><div style='${muMeta}'><div style='${muSub+';margin-bottom:6px'}'>100% Match</div><div>${esc(ev.time)}</div><div style='${muSub}'>${esc(ev.date)}</div><div style='${muRSVP}'>${ev.yes} Attendees<br>${ev.wait} Waitlist</div><div style='margin-top:6px'>${esc(ev.fee)}</div></div><div style='${muHosts}'>Hosted By: ${hc}</div></div>`;
+		if(host && chgHost) hc=host+` (Originally ${hc})`;
+		return `<p>Formbot thinks this event is:</p><div style='${muEvent}'><a style='${muLink+muTitle}' href='${ev.link}' target='_blank'>${ev.name}</a><div style='${muDetail}'><a style='${muLink+muVen}' href='${ev.link}' target='_blank'>${ev.ven}</a><div style='${muSub}'>${ev.loc}</div><div style='${muDesc}'>${ev.desc}</div></div><div style='${muMeta}'><div style='${muSub+';margin-bottom:6px'}'>100% Match</div><div>${ev.time}</div><div style='${muSub}'>${ev.date}</div><div style='${muRSVP}'>${ev.yes} Attendees<br>${ev.wait} Waitlist</div><div style='margin-top:6px'>${ev.fee}</div></div><div style='${muHosts}'>Hosted By: ${hc}</div></div>`;
 	} catch(e) { return [e.toString()]; }
 }
 
-//ack: stat=undefined/object -> success (emit true), stat=string -> error (emit false)
 function ack(sck, eType, stat) {
 	if(tyS(stat)) sck.cliLog('green', "ACK true"), sck.emit('ack', eType, true, stat);
 	else sck.cliErr(`(${eType}) `+stat), sck.emit('ack', eType, false, stat);
@@ -360,15 +349,16 @@ function cliToStr(sck) {
 }
 
 function logClientList() {
+	let c;
 	console.log("Clients:");
-	for(let c in Cli) console.log("-", C.yellow(cliToStr(Cli[c])));
+	for(c in Cli) console.log("-", C.yellow(cliToStr(Cli[c])));
 }
 
 function runInput() {
 	console.log("Type 'list' to list clients or 'q' to quit.");
 	process.stdin.resume(); process.stdin.setEncoding('utf8');
 	process.stdin.on('data', cmd => {
-		for(let s; (s=cmd.search(/[\n\r]/)) !== -1;) cmd=cmd.slice(0,s);
+		for(let s; (s=cmd.search(/[\n\r]/)) != -1;) cmd=cmd.substring(0,s);
 		if(cmd == 'exit' || cmd == 'q') {
 			console.log(C.magenta("Exiting..."));
 			process.exit();
@@ -379,7 +369,7 @@ function runInput() {
 function httpErr(sck, res, code, msg) {
 	const e = `Upload Code ${code}: ${msg}`;
 	if(sck) sck.cliErr(e); else console.error(e);
-	res.writeHead(code,''), res.write(`<pre style='font-size:16pt'>${esc(msg)}</pre>`), res.end();
+	res.writeHead(code,''), res.write(`<pre style='font-size:16pt'>${msg}</pre>`), res.end();
 }
 
 await begin();
