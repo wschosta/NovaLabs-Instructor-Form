@@ -251,22 +251,23 @@ function initCli(sck) {
 		if(tyS(title) || title.length > 120 || !pTitle.test(title)) return ack(sck,EV,"Bad input: title");
 		if(title.indexOf(':') == -1 || Number(title)) return ack(sck,EV,"Invalid title! Did you mean to auto-fill via class ID? To auto-fill, please select the name field again and press ENTER or ⏎");
 		if(tyS(date) || date.length > 80 || !pDate.test(date)) return ack(sck,EV,"Bad input: date");
-		if(tyS(uName) || !pText.test(uName)) return ack(sck,EV,"Bad input: instructorName");
-		if(tyS(uMail) || !pEmail.test(uMail)) return ack(sck,EV,"Bad input: instructorMail");
+		if(tyS(uName) || uName.length > 80 || !pText.test(uName)) return ack(sck,EV,"Bad input: instructorName");
+		if(tyS(uMail) || uMail.length > 254 || !pEmail.test(uMail)) return ack(sck,EV,"Bad input: instructorMail");
 		if(tyN(cMat) || cMat < 0) return ack(sck,EV,"Bad input: materialCost");
 		if(tyS(pdf) || pdf.length < 1) return ack(sck,EV,"Bad input: pdf");
 		if(cMat && !rData) return ack(sck,EV,"Receipts required if materialCost > $0");
 		if(pdf.length > 20000) return ack(sck,EV,"Pdf exceeded max size 20KB");
 		if(!Array.isArray(aList) || aList.length > 200) return ack(sck,EV,"Bad input: attendeeList");
-		if(!(sType >= 0) || sType && !aList.length) return ack(sck,EV,"Bad input: sType");
+		if(sType !== 0 && sType !== 1 && sType !== 2) return ack(sck,EV,"Bad input: sType");
+		if(sType && !aList.length) return ack(sck,EV,"Bad input: sType");
 
 		//Attendee List Error Checking
 		for(let i=0,a,e=0,l=aList.length; i<l; ++i) {
 			a=aList[i]; if(a.length !== 4) e="Invalid Length";
 			a.splice(0,2,a[0]+a[1]);
 			if(tyS(a[0]) || a[0].length > 80 || !pText.test(a[0])) e="Name Invalid";
-			if(tyS(a[1]) || a[1].length > 40) e="Level Invalid";
-			if(tyS(a[2]) || a[2].length > 15) e="Price Invalid";
+			if(tyS(a[1]) || a[1].length > 40 || !pText.test(a[1])) e="Level Invalid";
+			if(tyS(a[2]) || a[2].length > 15 || (a[2] && !/^[\w$.,\- ]+$/.test(a[2]))) e="Price Invalid";
 			if(e) return ack(sck, EV, `Bad input: attendeeList[${i}]: ${e}`);
 		}
 
