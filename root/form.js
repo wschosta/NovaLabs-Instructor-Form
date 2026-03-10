@@ -240,7 +240,7 @@ function rstForm() {
 
 function genEvent(ev,e) {
 	EvData=ev; muMatch.innerHTML=''; muReject.hidden=0;
-	const box=utils.mkDiv(muMatch,'muEvent'); if(e) return box.innerHTML="<b>Error:</b> "+e;
+	const box=utils.mkDiv(muMatch,'muEvent'); if(e) {utils.mkEl('b',box).textContent="Error: "; box.append(e); return;}
 	rstForm();
 	//Info:
 	let t=utils.mkEl('a',box,'muTitle'), i=utils.mkDiv(box,'muDetail'),
@@ -254,10 +254,13 @@ function genEvent(ev,e) {
 	utils.mkDiv(m,'muRSVP',null,ev.yes+" Attendees<br>"+ev.wait+" Waitlist");
 	utils.mkDiv(m,null,{marginTop:6},ev.fee);
 	//Hosts:
-	let hl=utils.mkDiv(box, 'muHosts'), hc="Hosted By: ";
-	for(let i=0,l=ev.hosts.length; i<l; i++) hc += (i?', ':'')+"<a href='"
-		+ev.link+"' target='_blank' class='muVen'>"+ev.hosts[i].name+"</a>";
-	hl.innerHTML=hc; fTitle.value=ev.name; ev._ln=ev.name.toLowerCase();
+	let hl=utils.mkDiv(box, 'muHosts');
+	hl.append("Hosted By: ");
+	for(let i=0,l=ev.hosts.length,a; i<l; i++) {
+		if(i) hl.append(', ');
+		a=utils.mkEl('a',hl,'muVen'); a.href=ev.link; a.target='_blank'; a.textContent=ev.hosts[i].name;
+	}
+	fTitle.value=ev.name; ev._ln=ev.name.toLowerCase();
 	utils.setDateTime(fDate, ev.d=new Date(ev.dRaw));
 	evApply(); fAdc.onchange();
 }
