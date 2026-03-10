@@ -148,7 +148,7 @@ function httpsReq(uri, mt, hdr, rb) {
 		function rEnd(e) { //May fire from 'end', 'error', or timeout; rq.ee guards against double-resolve
 			if(rq.ee) return; if(e) rq.destroy(); rq.ee=1; clearTimeout(tt);
 			if(e) rej(e);
-			else if(re.statusCode != 200) rej(Error("Code "+re.statusCode+(dat?" "+dat:'')+" "+uri));
+			else if(re.statusCode !== 200) rej(Error("Code "+re.statusCode+(dat?" "+dat:'')+" "+uri));
 			else res(dat);
 		}
 	});
@@ -317,8 +317,8 @@ function initCli(sck) {
 	sck.emit('connection', sck.uid, VER);
 }
 
-function tyS(v) {return typeof v != 'string'}
-function tyN(v) {return typeof v != 'number'}
+function tyS(v) {return typeof v !== 'string'}
+function tyN(v) {return typeof v !== 'number'}
 function esc(s) {return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;')}
 
 const tStyle='overflow:hidden;max-width:1000px;color:#888;border-radius:10px;width:100%;border-collapse:collapse;background:#f5f5f5;box-shadow:2px 2px 2px rgba(0,0,0,0.3);font-size:16px;table-layout:fixed', tdStyle='border-top:1px solid #eee;padding:9px 12px;line-height:15px;white-space:nowrap;text-overflow:ellipsis;overflow:hidden', trFirstStyle='border-top:none;background:#eee', trEvenStyle="style='background:#dcdcdc'", nameStyle='font-weight:700', mailStyle='color:#5299e2;font-weight:500', userStyle='text-align:right';
@@ -360,9 +360,8 @@ function cliToStr(sck) {
 }
 
 function logClientList() {
-	let c;
 	console.log("Clients:");
-	for(c in Cli) console.log("-", C.yellow(cliToStr(Cli[c])));
+	for(let c in Cli) console.log("-", C.yellow(cliToStr(Cli[c])));
 }
 
 function runInput() {

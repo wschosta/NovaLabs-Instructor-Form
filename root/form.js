@@ -13,8 +13,8 @@ let DB, DS, BDF, Socket, SData={}, QData, StatMsg, PdfData, PdfSub, EvData;
 const BgSize=400, BgSpd=10/1000, OCMax=255<<24; //OCMax: opaque alpha mask for Uint32 pixel ops
 let Blur,bgPos=0,bSkp=0,bTs,bgGPU; //bSkp: 0=idle, increments on focus, 1=triggers redraw then resets
 
-window.onblur = () => {Blur=1}
-window.onfocus = () => {Blur=0}
+window.onblur = () => {Blur=1};
+window.onfocus = () => {Blur=0};
 
 function initBg() {
 	bgBox.i=new Image(); bgBox.i.src='resources/bg.svg';
