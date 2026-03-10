@@ -147,7 +147,8 @@ function httpsReq(uri, mt, hdr, rb) {
 		tt=setTimeout(() => rEnd(Error("Timed Out")), ReqTimeout);
 		function rEnd(e) {
 			if(rq.ee) return; if(e) rq.destroy(); rq.ee=1; clearTimeout(tt);
-			if(!e && re.statusCode != 200) rej(Error("Code "+re.statusCode+(dat?" "+dat:'')+" "+uri));
+			if(e) rej(e);
+			else if(re.statusCode != 200) rej(Error("Code "+re.statusCode+(dat?" "+dat:'')+" "+uri));
 			else res(dat);
 		}
 	});
